@@ -112,14 +112,15 @@ def trainSupervised(train_dataloader, test_dataloader, numFeatures  , numOutputs
 
 def train_loop(model, loss_fn, optimizer, dataloader):
 	size= len(dataloader.dataset)
-
+	
+	model.train()
 	for batch, (X, y) in enumerate(dataloader):
 	
 		optimizer.zero_grad()
 		# Compute prediction and loss
 
 		pred = model(X.float())
-		Loss = MSELoss() #L1Loss() #MSELoss()#loss_fn(pred, y)
+		Loss = MSELoss() 
 		loss = Loss(pred, y.float())
 		# Backpropagation
 		loss.backward()
@@ -135,6 +136,7 @@ def test_loop(dataloader, model, loss_fn):
 	size = len(dataloader.dataset)
 	num_batches = len(dataloader)
 	test_loss= 0
+	model.eval()
 
 	with torch.no_grad():
 		for X, y in dataloader:
