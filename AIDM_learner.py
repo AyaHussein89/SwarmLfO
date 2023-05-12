@@ -39,14 +39,14 @@ num_eps = 10
 class NeuralNetwork(nn.Module):
 	def __init__(self,feature_size, action_size):
 		super(NeuralNetwork, self).__init__()
-		hidden_size= 50 #250 # 230 # int(2*feature_size)
+		hidden_size= 50 
 		self.linear_relu_stack = nn.Sequential(
 			nn.Linear(feature_size, hidden_size),
 			nn.ReLU(),	
 			nn.Linear(int(hidden_size), action_size),
 
 		)
-		#self.linear_relu_stack.apply(self.init_weights)
+		
 		self.patience=3
 		self.min_delta=0.00
 		self.early_stopper = EarlyStopper(patience=self.patience, min_delta=self.min_delta)
@@ -91,7 +91,7 @@ def trainSupervised(train_dataloader, test_dataloader, numFeatures  , numOutputs
 	supervisedNetwork= NeuralNetwork(numFeatures  , numOutputs).to(device)
 
 	loss_fn =MSELoss()
-	optimizer = torch.optim.Adam(supervisedNetwork.parameters() , lr= lr) # lr= 8e-2)
+	optimizer = torch.optim.Adam(supervisedNetwork.parameters() , lr= lr) 
 	scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 
 	for t in range(epochs):
@@ -112,13 +112,14 @@ def train_loop(model, loss_fn, optimizer, dataloader):
 	size= len(dataloader.dataset)
 	avg_loss = 0
 	counter = 0
+	model.train()
 	for batch, (X, y) in enumerate(dataloader):
 	
 		optimizer.zero_grad()
 		# Compute prediction and loss
 
 		pred = model(X.float())
-		Loss = MSELoss()#loss_fn(pred, y)
+		Loss = MSELoss()
 		loss = Loss(pred, y.float())
 		# Backpropagation
 		loss.backward()
@@ -136,7 +137,7 @@ def test_loop(dataloader, model, loss_fn):
 	size = len(dataloader.dataset)
 	num_batches = len(dataloader)
 	test_loss= 0
-
+        model.eval()
 	with torch.no_grad():
 		for X, y in dataloader:
 			pred = model(X.float())
@@ -184,7 +185,7 @@ if True:
 			train_len = int(len(annotated_data)*0.8)
 			train_set, test_set = torch.utils.data.random_split(annotated_data, [train_len, len(annotated_data) - train_len])
 			train_loader = DataLoader(train_set, batch_size=2048, shuffle=True)
-			test_loader = DataLoader(test_set, batch_size=4048, shuffle=False)
+			test_loader = DataLoader(test_set, batch_size=2048, shuffle=False)
 			inverseDynamicsNetwork= trainSupervised(train_loader, test_loader, numFeatures, numOutputs, epochs, lr)
 			if explorationSetting =="state_transitions":
 				pickle.dump(inverseDynamicsNetwork , open("IDM/inverseDynamicsNetwork"+str(i) , 'wb'))
