@@ -66,7 +66,7 @@ class Agent:
 		self.y = np.random.uniform(minY,maxY,numberOfAgent)
 		self.goal_x=np.array([self.goal[0] for i in range(numberOfAgent)])
 		self.goal_y=np.array([self.goal[1] for i in range(numberOfAgent)])
-		self.orientation = np.random.uniform(0,2*math.pi,numberOfAgent)
+		self.orientation = np.random.uniform(-math.pi,math.pi,numberOfAgent)
 
 		self.neighbours = np.zeros(numberOfAgent) # num neighbours for each agent
 
