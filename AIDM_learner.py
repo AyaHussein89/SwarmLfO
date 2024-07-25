@@ -20,6 +20,8 @@ numOutputs = 2
 train = sys.argv[1] # "1" or "0"
 explorationSetting = sys.argv[2] # "obs_transitions" or "state_transitions"
 
+os.makedirs("IDM", exist_ok=True)
+os.makedirs("IDM-obs", exist_ok=True)
 
 if explorationSetting =="state_transitions":
 	path = "exploration"
@@ -102,7 +104,6 @@ def trainSupervised(train_dataloader, test_dataloader, numFeatures  , numOutputs
 			validation_loss = test_loop(test_dataloader, supervisedNetwork, loss_fn)
 			if supervisedNetwork.early_stopper.early_stop(validation_loss):             
 				break
-			#scheduler.step(validation_loss)
 
 	return supervisedNetwork
 	
@@ -125,7 +126,7 @@ def train_loop(model, loss_fn, optimizer, dataloader):
 		loss.backward()
 		optimizer.step()
 
-		#if batch % 100 == 0:
+		
 		loss, current = loss.item(), batch * len(X)
 		avg_loss+= loss
 		counter+=1
@@ -137,7 +138,7 @@ def test_loop(dataloader, model, loss_fn):
 	size = len(dataloader.dataset)
 	num_batches = len(dataloader)
 	test_loss= 0
-        model.eval()
+	model.eval()
 	with torch.no_grad():
 		for X, y in dataloader:
 			pred = model(X.float())
@@ -169,38 +170,36 @@ def evaluateinverseDynamics(fileName, num_outputs, inverseDynamicsNet):
 			
 	for j in range(num_outputs):
 		print("RMSE ", j , ": ", math.sqrt(MSE[j]/len(dataset)))
-		#print("avg action value: ", j, avgY[j]/len(dataset))
 
 
 
 
-if True:
-	if train =="1":
-		epochs = 300
-		lr = 1e-2
-		SwarmTasksDataset.num_outputs = numOutputs 
+
+
+if train =="1":
+	epochs = 300
+	lr = 1e-2
+	SwarmTasksDataset.num_outputs = numOutputs 
 		
-		for i in range(num_eps): 
-			annotated_data= SwarmTasksDataset(os.path.join(path, fileName+ str(i) +".csv"), 'data') #
-			train_len = int(len(annotated_data)*0.8)
-			train_set, test_set = torch.utils.data.random_split(annotated_data, [train_len, len(annotated_data) - train_len])
-			train_loader = DataLoader(train_set, batch_size=2048, shuffle=True)
-			test_loader = DataLoader(test_set, batch_size=2048, shuffle=False)
-			inverseDynamicsNetwork= trainSupervised(train_loader, test_loader, numFeatures, numOutputs, epochs, lr)
-			if explorationSetting =="state_transitions":
-				pickle.dump(inverseDynamicsNetwork , open("IDM/inverseDynamicsNetwork"+str(i) , 'wb'))
-			else:
-				pickle.dump(inverseDynamicsNetwork , open("IDM-obs/inverseDynamicsNetwork"+str(i) , 'wb'))
-
-	if test:
+	for i in range(num_eps): 
+		annotated_data= SwarmTasksDataset(os.path.join(path, fileName+ str(i) +".csv"), 'data') #
+		train_len = int(len(annotated_data)*0.8)
+		train_set, test_set = torch.utils.data.random_split(annotated_data, [train_len, len(annotated_data) - train_len])
+		train_loader = DataLoader(train_set, batch_size=2048, shuffle=True)
+		test_loader = DataLoader(test_set, batch_size=2048, shuffle=False)
+		inverseDynamicsNetwork= trainSupervised(train_loader, test_loader, numFeatures, numOutputs, epochs, lr)
 		if explorationSetting =="state_transitions":
-			for i in range(num_eps):
-				inverseDynamicsNetwork= pickle.load(open("IDM/inverseDynamicsNetwork"+str(i) , 'rb'))
-
-				evaluateinverseDynamics(os.path.join(path, fileName+ str(num_eps-i-1) +".csv"),numOutputs , inverseDynamicsNetwork)
-
+			pickle.dump(inverseDynamicsNetwork , open("IDM/inverseDynamicsNetwork"+str(i) , 'wb'))
 		else:
-			for i in range(num_eps):
-				inverseDynamicsNetwork= pickle.load(open("IDM-obs/inverseDynamicsNetwork"+str(i) , 'rb'))
-				evaluateinverseDynamics(os.path.join(path, fileName+ str(num_eps-i-1) +".csv"),numOutputs , inverseDynamicsNetwork)		
+			pickle.dump(inverseDynamicsNetwork , open("IDM-obs/inverseDynamicsNetwork"+str(i) , 'wb'))
+if test:
+	if explorationSetting =="state_transitions":
+		for i in range(num_eps):
+			inverseDynamicsNetwork= pickle.load(open("IDM/inverseDynamicsNetwork"+str(i) , 'rb'))
+			evaluateinverseDynamics(os.path.join(path, fileName+ str(num_eps-i-1) +".csv"),numOutputs , inverseDynamicsNetwork)
+
+	else:
+		for i in range(num_eps):
+			inverseDynamicsNetwork= pickle.load(open("IDM-obs/inverseDynamicsNetwork"+str(i) , 'rb'))
+			evaluateinverseDynamics(os.path.join(path, fileName+ str(num_eps-i-1) +".csv"),numOutputs , inverseDynamicsNetwork)		
 
