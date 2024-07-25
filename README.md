@@ -16,6 +16,4 @@ Example usage:
 5. DecLfORuns.sh: must be used after the exploration phase is complete (1.) and the expert observations are provided (2.). Used to generate the results for Dec-Exp-LfO  in the paper
 6. LfDRuns.sh:   must be used after the expert demonstrations are provided (2.) Used to generate the results for LfD model in the paper. 
 
-
-
-
+Two more swarm tasks have been added: Dispersion and Herding
