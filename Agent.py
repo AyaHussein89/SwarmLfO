@@ -8,6 +8,7 @@ import random
 import sys
 from Graph import Graph
 import copy
+import csv
 
 class Agent:
 
@@ -15,7 +16,7 @@ class Agent:
 	numberOfAgent= 20
 	dimension=0	
 	goal=[10,10]
-
+	isDispersion = False
 
 	#Physical specs similar to  e-puck version 1.3 (All dimensions are in meters)
 	# see https://www.gctronic.com/doc/index.php/e-puck2
@@ -38,7 +39,7 @@ class Agent:
 	sensingRange=  collisionRange*5
 	cohesionRange =  sensingRange
 	alignmentRange=  sensingRange 
-	influenceRange = 0 
+	influenceRange = sensingRange *3
 
 	x_landmark = None
 	y_landmark = None
@@ -78,17 +79,23 @@ class Agent:
 
 		#rendering
 		self.relative_observation_shape = (650, 650, 3)
-		self.factor= (650-self.iconDimension*2)/self.dimension #(600-self.iconDimension*3)/self.dimension
+		self.factor= np.uint8((650-self.iconDimension*2)/self.dimension) 
+		self.canvas = np.ones(self.relative_observation_shape, dtype=np.uint8) * 255   
 
-		self.agentIcon = cv2.imread("agent.jpg") / 255.0
-		self.agentIcon_w = 4#int(self.bodyRadius *2* self.factor/self.iconDimension) #int(self.iconDimension/4) 
-		self.agentIcon_h = 4 #int(self.bodyRadius *2* self.factor/self.iconDimension) #int(self.iconDimension/4)	
+		self.agentIcon = cv2.imread("agent.jpg") #/ 255.0
+		self.agentIcon_w = 4 
+		self.agentIcon_h = 4 
 		self.agentIcon = cv2.resize(self.agentIcon, (self.agentIcon_h, self.agentIcon_w))
 		
-		self.landmarkIcon =  cv2.imread("landmark.jpg") / 255.0
-		self.landmarkIcon_w =  5#int(self.bodyRadius * 2*self.factor/self.iconDimension) #int(self.iconDimension/4) 
-		self.landmarkIcon_h = 5 #int(self.bodyRadius * 2*self.factor/self.iconDimension) #int(self.iconDimension/4)
+		self.landmarkIcon =  cv2.imread("landmark.jpg") 
+		self.landmarkIcon_w =  15 
+		self.landmarkIcon_h = 15 
 		self.landmarkIcon = cv2.resize(self.landmarkIcon, (self.landmarkIcon_h, self.landmarkIcon_w))
+
+		self.dogIcon = cv2.imread("dog.jpg") 
+		self.dogIcon_w = 6   
+		self.dogIcon_h = 6   
+		self.dogIcon = cv2.resize(self.dogIcon, (self.dogIcon_h, self.dogIcon_w))
 
 			
 
@@ -140,19 +147,23 @@ class Agent:
 
 		
 	def init_full_tr_file(self,num_eps,file_number):
-		self.file_adj_features  = open( self.adj_file_name +str(file_number), "w") # adjMap, adjVx, adjVy
+		self.file_adj_features  = open( self.adj_file_name +str(file_number), "w") 
 		self.file_adj_features.write("%1.0f\n" % self.numberOfAgent)
 		self.file_adj_features.write("%1.0f\n" % self.maxTimeSteps)
-		#self.file_adj_features.write("%1.0f\n" % self.dimension) 
 		self.file_adj_features.write("%1.0f\n" % num_eps) 
-		
+		self.csv_file_abs = self.adj_file_name +str(file_number) + ".csv"
+		with open(self.csv_file_abs, mode='w') as file:
+			pass		
 
 	def init_raltive_file(self,num_eps, file_number):
-		self.file_relative_features  = open( self.file_relative_features_name +str(file_number) , "w") # adjMap, adjVx, adjVy
+		self.file_relative_features  = open( self.file_relative_features_name +str(file_number) , "w") 
 		self.file_relative_features.write("%1.0f\n" % self.numberOfAgent)
 		self.file_relative_features.write("%1.0f\n" % self.maxTimeSteps)
-		#self.file_relative_features.write("%1.0f\n" % self.dimension) 
 		self.file_relative_features.write("%1.0f\n" % num_eps) 
+		self.csv_file_relative = self.file_relative_features_name +str(file_number) + ".csv"
+		with open(self.csv_file_relative, mode='w') as file:
+			pass
+
 
 	# Expert sheltering algorithm
 	def applySheltering(self): 
@@ -189,6 +200,8 @@ class Agent:
 
 	# takes dog position and calls the functions for calculating the new position of each agent; set as -5 if no dog exist in the environment
 	def updateFlockingAgentPositions(self, dogX = -5, dogY =-5):
+		self.dog_x = dogX
+		self.dog_y = dogY
 		self.step +=1
 		NewLocationX= np.zeros(self.numberOfAgent)
 		NewLocationY= np.zeros(self.numberOfAgent)
@@ -234,32 +247,23 @@ class Agent:
 
 
 	
-	# logs agent transitions in the format: 	s(t), s(t+1), a(t)
+	# logs agent state transitions in the format: 	s(t), s(t+1), a(t)
 	def write_absolute_local_transitions(self):
-		for i in range(len(self.x)):
-			for j in range(len(self.absolute_obs_last[0])):
-				self.file_adj_features.write("%1.6f\n"%(self.absolute_obs_last[i][j]))
-			self.absolute_obs[i] = self.get_absolute_obs(i)
-
-			for j in range(len(self.absolute_obs[0])):
-				self.file_adj_features.write("%1.6f\n"%(self.absolute_obs[i][j]))
-
-			self.file_adj_features.write("%1.6f\n"%(self.velocityX[i]))
-			self.file_adj_features.write("%1.6f\n"%(self.velocityY[i]))
+		with open(self.csv_file_abs, mode='a', newline='') as file:
+			writer = csv.writer(file)
+			for i in range(len(self.x)):
+				self.absolute_obs[i] = self.get_absolute_obs(i)
+				writer.writerow(self.absolute_obs_last[i] + self.absolute_obs[i] + [self.velocityX[i], self.velocityY[i]])
 
 
-	# logs agent transitions in the format: 	o(t), o(t+1), a(t)
+
+	# logs agent observation transitions in the format: 	o(t), o(t+1), a(t)
 	def write_relative_local_transitions(self):
-		for i in range(len(self.x)):
-			for j in range(len(self.relative_obs_last[0])):
-				self.file_relative_features.write("%1.6f\n"%(self.relative_obs_last[i][j]))
-			self.relative_obs[i] = self.get_relative_obs(i)
-
-			for j in range(len(self.relative_obs[0])):
-				self.file_relative_features.write("%1.6f\n"%(self.relative_obs[i][j]))
-
-			self.file_relative_features.write("%1.6f\n"%(self.velocityX[i]))
-			self.file_relative_features.write("%1.6f\n"%(self.velocityY[i]))
+		with open(self.csv_file_relative, mode='a', newline='') as file:
+			writer = csv.writer(file)
+			for i in range(len(self.x)):
+				self.relative_obs[i] = self.get_relative_obs(i)
+				writer.writerow(self.relative_obs_last[i] + self.relative_obs[i] + [self.velocityX[i], self.velocityY[i]])
 
 
 
@@ -304,17 +308,14 @@ class Agent:
 	def estimate_light_val_orientation(self, i):
 		nearest_light_id = -1
 		nearest_light_dist_sqrd = (self.dimension*2) **2
-		min_possible_dist_to_light = 0.05
 
 		for j in range(len(self.target_points)):
 			dist_sqrd = (self.x[i]-self.target_points[j][0])**2 + (self.y[i]-self.target_points[j][1])**2
 			if dist_sqrd < nearest_light_dist_sqrd :
 				nearest_light_dist_sqrd = dist_sqrd 
 				nearest_light_id =  j
-
 		
-		nearest_light_dist_sqrd = max(nearest_light_dist_sqrd, min_possible_dist_to_light)
-		sensed_intensity= min(Agent.light_intenisity *(min_possible_dist_to_light)**2/nearest_light_dist_sqrd, self.light_sensitivity_max)
+		sensed_intensity= min(Agent.light_intenisity/(nearest_light_dist_sqrd+0.00001), self.light_sensitivity_max)
 		if sensed_intensity> self.light_sensitivity_min:
 			# first value is sensed_intensity/self.light_sensitivity_max to be normalised
 			return sensed_intensity/self.light_sensitivity_max, (self.target_points[nearest_light_id][0] - self.x[i])/self.dimension, (self.target_points[nearest_light_id][1] - self.y[i])/self.dimension
@@ -352,13 +353,21 @@ class Agent:
 
 		goalorientationX = self.goal_x[AgentID] - self.x[AgentID]
 		goalorientationY = self.goal_y[AgentID] - self.y[AgentID]
-		[goalorientationX, goalorientationY] = cmn.normalise(goalorientationX ,goalorientationY) #cmn.adjustVectorMax(np.array([goalorientationX, goalorientationY]),1)
+		[goalorientationX, goalorientationY] = cmn.normalise(goalorientationX ,goalorientationY) 
 
 		oldvelocityX = self.velocityX[AgentID]
 		oldvelocityY = self.velocityY[AgentID]
 
-		velocityRequiredX =  Agent.weightOfInertia*oldvelocityX + Agent.weightCohesion * GCMorientationX + Agent.weightAlignment * GCMAlignmentorientationX + Agent.weightCollision * CollisionX + Agent.weightGoal * goalorientationX + Agent.weightRand * random.uniform(-1, 1)
-		velocityRequiredY =  Agent.weightOfInertia*oldvelocityY + Agent.weightCohesion * GCMorientationY + Agent.weightAlignment * GCMAlignmentorientationY + Agent.weightCollision * CollisionY + Agent.weightGoal * goalorientationY +Agent.weightRand * random.uniform(-1, 1)
+		velocityRequiredX =  Agent.weightCohesion * GCMorientationX + Agent.weightAlignment * GCMAlignmentorientationX + Agent.weightCollision * CollisionX + Agent.weightGoal * goalorientationX + Agent.weightRand * random.uniform(-1, 1)
+		velocityRequiredY =  Agent.weightCohesion * GCMorientationY + Agent.weightAlignment * GCMAlignmentorientationY + Agent.weightCollision * CollisionY + Agent.weightGoal * goalorientationY +Agent.weightRand * random.uniform(-1, 1)
+
+		if Agent.isDispersion and velocityRequiredX ==0 and velocityRequiredY == 0 :
+			velocityRequiredX = math.cos(self.orientation[AgentID] )
+			velocityRequiredY = math.sin(self.orientation[AgentID] )
+		else:
+			velocityRequiredX +=  Agent.weightOfInertia*oldvelocityX
+			velocityRequiredY +=  Agent.weightOfInertia*oldvelocityY
+			
 
 		#relevant only for shepherding tasks
 		CurrentPosition = [self.x[AgentID], self.y[AgentID]]
@@ -451,26 +460,9 @@ class Agent:
 
 	# to be used in the future to simulate a specific phyics model of the agent. 	
 	def agentvehiclemodel(self, Position, VelocityCurrent, VelocityRequired):
-		MaximumForce = 1.0
-		Mass = 1.0
-
-		#Calculating steering orientation from orientation
-		Steeringorientation = VelocityRequired - VelocityCurrent		
-		Steeringorientation = cmn.adjustVectorMax(Steeringorientation, MaximumForce)
+		VelocityNew = cmn.adjustVectorMax(VelocityRequired, self.agentVehicleSpeedLimit)
+		return [VelocityNew, Position + VelocityNew]
 		
-		#Calculating acceleration needed to achieve steering force
-		AccelerationDesired = Steeringorientation * (1/Mass)
-
-		#Calculating velocity without exceeding maximum speed
-		VelocityDesired = VelocityCurrent + AccelerationDesired
-		VelocityNew = cmn.adjustVectorMax(VelocityDesired, self.agentVehicleSpeedLimit)
-
-		#Updating vehicle position
-		PositionNew = Position + VelocityNew
-
-		return [VelocityNew, PositionNew]
-		
-		#Output = [VelocityNew PositionNew OrientationNew]
 
 
 
@@ -487,13 +479,11 @@ class Agent:
 			if abs(self.x[agentID]- self.x_last[i]) < abs(self.x_last[agentID]- self.x_last[i]) and abs(self.x[agentID]- self.x_last[i]) < Agent.bodyRadius*2:
 				self.x[agentID] = copy.deepcopy(self.x_last[agentID])
 				self.recent_collisionX[agentID] = 1
-				#print("collision @ ", agentID )
-				#self.velocityX[agentID] = 0
+
 			if abs(self.y[agentID]- self.y_last[i]) < abs(self.y_last[agentID]- self.y_last[i]) and abs(self.y[agentID]== self.y_last[i]) < Agent.bodyRadius*2:
 				self.y[agentID] = copy.deepcopy(self.y_last[agentID])
-				#self.velocityY[agentID] = 0	
 				self.recent_collisionY[agentID] = 1	
-				#print("collision @ ", agentID )	
+
 
 
 
@@ -540,6 +530,57 @@ class Agent:
 		for i in range(self.numberOfAgent):
 			distances[i] = np.sqrt(diffX[i]**2 +diffY[i]**2)
 		return distances 	
+
+
+	def calculateGCM(self, excludeAtGoal):
+		if excludeAtGoal:
+			self.gcm= [0,0]
+			num=0
+			for i in range(self.numberOfAgent):
+				if cmn.magnitude(self.x[i]-self.goal[0],self.y[i]-self.goal[1])> self.goalRadius:
+					num+=1
+					self.gcm[0] += self.x[i]
+					self.gcm[1] += self.y[i]
+			if num>0:	
+				self.gcm[0]/= num
+				self.gcm[1]/= num
+			
+		else:
+			self.gcm = [np.mean(self.x) , np.mean(self.y)]	
+
+
+
+	# get index of furthest sheep
+	def getFurthestSheepFromGCM(self, excludeAtGoal=False):
+		FurthestSheepDistance = 0
+		FurthestSheepIndex = -1
+		self.calculateGCM(excludeAtGoal)
+		
+		X = self.x - self.gcm[0]
+		Y = self.y - self.gcm[1]
+		Distances = np.sqrt(X**2 + Y**2)
+			
+		for i in range(self.numberOfAgent):
+			if Distances[i] > FurthestSheepDistance and (excludeAtGoal and cmn.distanceBetween(self.goal, np.array([self.x[i],self.y[i]]))> self.goalRadius or not excludeAtGoal):
+				FurthestSheepDistance = Distances[i]
+				FurthestSheepIndex = i           		    
+		return [FurthestSheepIndex, FurthestSheepDistance]
+
+	def getFurthestSheepFromGoal(self):
+		FurthestSheepDistance = 0
+		FurthestSheepIndex = -1
+		self.calculateGCM(excludeAtGoal=False)
+		
+		X = self.x - self.goal[0]
+		Y = self.y - self.goal[1]
+		Distances = np.sqrt(X**2 + Y**2)
+			
+		for i in range(self.numberOfAgent):
+			if Distances[i] > FurthestSheepDistance :
+				FurthestSheepDistance = Distances[i]
+				FurthestSheepIndex = i           		    
+		return [FurthestSheepIndex, FurthestSheepDistance]
+
 		
 			
 
@@ -558,30 +599,45 @@ class Agent:
 
 
 	def render(self, mode = "human"):
-		assert mode in ["human", "rgb_array"], "Invalid mode, must be either \"human\" or \"rgb_array\""
+		self.draw_elements_on_canvas()
+		if self.canvas.dtype != np.uint8:
+			self.canvas = self.canvas.astype(np.uint8)
 		if mode == "human":
-			self.draw_elements_on_canvas()
 			cv2.imshow("Game", self.canvas)
 			cv2.waitKey(10)
     
-		elif mode == "rgb_array":
-			return self.canvas	
+		elif mode == "video":
+			self.video_writer.write(self.canvas)
+
 			
-	def draw_elements_on_canvas(self):
-		# Init the canvas 
-		self.canvas = np.ones(self.relative_observation_shape) * 1
-		elem_shape = self.agentIcon.shape
-		for i in range(self.numberOfAgent):
-			x,y = int(self.x[i]*self.factor+self.iconDimension), int(self.y[i]*self.factor+self.iconDimension)
-			self.canvas[y : y + elem_shape[1], x:x + elem_shape[0]] = self.agentIcon
-		
+	def draw_elements_on_canvas(self):		
+
+		self.canvas.fill(255)
+
 		if not (self.x_landmark is None):
 			elem_shape = self.landmarkIcon.shape
 			for i in range(len(self.x_landmark)):
 				x,y = int(self.x_landmark[i]*self.factor+self.iconDimension), int(self.y_landmark[i]*self.factor+self.iconDimension)
 				self.canvas[y : y + elem_shape[1], x:x + elem_shape[0]] = self.landmarkIcon
 
-
+		elem_shape = self.agentIcon.shape
+		for i in range(self.numberOfAgent):
+			x,y = int(self.x[i]*self.factor+self.iconDimension), int(self.y[i]*self.factor+self.iconDimension)
+			self.canvas[y : y + elem_shape[1], x:x + elem_shape[0]] = self.agentIcon
+		
+		if (self.dog_x >=0 and self.dog_y >=0 and self.dog_x <=self.dimension and self.dog_y <= self.dimension):
+			elem_shape = self.dogIcon.shape
+			x,y = int(self.dog_x*self.factor+self.iconDimension), int(self.dog_y*self.factor+self.iconDimension)
+			self.canvas[y : y + elem_shape[1], x:x + elem_shape[0]] = self.dogIcon
 		
 		text = 'Time: {}'.format(self.step)
 		self.canvas = cv2.putText(self.canvas, text, (10,20), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.8, (0,0,0), 1, cv2.LINE_AA)
+
+
+	def initialise_video(self, output_file, fps =30, width = 650, height=  650):
+		self.video_writer = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc(*'XVID'), fps, (width ,height))
+
+	def finish_recording(self):
+		self.video_writer.release()
+		cv2.destroyAllWindows()
+
